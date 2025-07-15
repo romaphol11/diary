@@ -10,12 +10,43 @@
       background-color: #fff;
       color: #000;
       padding: 1em;
+      max-width: 600px;
+      margin: 0 auto;
     }
-    #date { font-weight: bold; margin-bottom: 1em; }
-    #content { white-space: pre-wrap; }
+    #date { 
+      font-weight: bold; 
+      margin-bottom: 1em; 
+      font-size: 1.2em;
+    }
+    #content { 
+      white-space: pre-wrap; 
+      line-height: 1.6;
+      margin-bottom: 2em;
+    }
     #passwordPrompt {
       display: none;
       margin-top: 1em;
+      padding: 1em;
+      border: 1px solid #000;
+      background-color: #f9f9f9;
+    }
+    #randomButton {
+      display: block;
+      margin: 2em auto;
+      padding: 1em 2em;
+      font-size: 1.1em;
+      cursor: pointer;
+    }
+    #randomButton:disabled {
+      background-color: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+    #quota {
+      text-align: center;
+      margin-bottom: 1em;
+      font-size: 0.9em;
+      color: #666;
     }
     input, button {
       font-family: monospace;
@@ -23,16 +54,36 @@
       color: #000;
       border: 1px solid #000;
       padding: 0.5em;
+      margin: 0.25em;
     }
-    button:hover {
+    button:hover:not(:disabled) {
       background-color: #000;
       color: #fff;
+    }
+    .entry-container {
+      display: none;
+      margin-top: 2em;
+    }
+    .entry-container.show {
+      display: block;
+    }
+    .loading {
+      text-align: center;
+      color: #666;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
   <h1>📓 ไดอารี่ของเรา</h1>
-  <div id="diary">
+  
+  <div id="quota"></div>
+  
+  <button id="randomButton" onclick="randomDiary()">
+    🎲 สุ่มอ่านไดอารี่
+  </button>
+  
+  <div id="diary" class="entry-container">
     <div id="date"></div>
     <div id="content"></div>
     <div id="passwordPrompt">
@@ -41,101 +92,175 @@
       <button onclick="checkPassword()">ปลดล็อก</button>
     </div>
   </div>
+
   <script>
-    // ตัวอย่างข้อมูล diary (ในการใช้งานจริงควรมีไฟล์ diary.json)
-    const sampleDiary = [
-      {
-        date: "2025-01-15",
-        content: "วันนี้เป็นวันที่ดี\nอากาศสดใส\nไปเที่ยวกับเพื่อน",
-        locked: false
-      },
-      {
-        date: "2025-01-14", 
-        content: "วันนี้ฝนตก\nอยู่บ้านอ่านหนังสือ\nทำงานเสร็จแล้ว",
-        locked: true,
-        password: "1234"
-      },
-      {
-        date: "2025-01-13",
-        content: "ไปทำงานสาย\nแต่โชคดีไม่มีใครว่า\nเย็นไปกินข้าวกับครอบครัว",
-        locked: false
-      },
-      {
-        date: "2025-01-12",
-        content: "ความลับส่วนตัว\nวันนี้เจอคนพิเศษ\nรู้สึกดีมาก",
-        locked: true,
-        password: "love"
+    let diaryData = [];
+    let currentEntry = null;
+    let hasReadToday = false;
+
+    // ฟังก์ชันเช็คโควต้าวันละครั้ง
+    function checkDailyQuota() {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastReadDate = getStoredData('lastReadDate');
+      
+      if (lastReadDate === today) {
+        hasReadToday = true;
+        document.getElementById('randomButton').disabled = true;
+        document.getElementById('randomButton').textContent = '📚 วันนี้อ่านแล้ว';
+        document.getElementById('quota').textContent = '✅ คุณได้อ่านไดอารี่วันนี้แล้ว กลับมาใหม่พรุ่งนี้นะ';
+      } else {
+        hasReadToday = false;
+        document.getElementById('randomButton').disabled = false;
+        document.getElementById('randomButton').textContent = '🎲 สุ่มอ่านไดอารี่';
+        document.getElementById('quota').textContent = '📖 คุณสามารถอ่านไดอารี่ได้ 1 ครั้งต่อวัน';
       }
-    ];
+    }
 
-    async function fetchDiary() {
+    // ฟังก์ชันเก็บข้อมูลใน memory (แทน localStorage)
+    const memoryStorage = {};
+    
+    function getStoredData(key) {
+      return memoryStorage[key] || null;
+    }
+    
+    function setStoredData(key, value) {
+      memoryStorage[key] = value;
+    }
+
+    // โหลดข้อมูลไดอารี่
+    async function loadDiary() {
       try {
-        // ลองโหลดจากไฟล์ก่อน หากไม่สำเร็จให้ใช้ข้อมูลตัวอย่าง
-        let diary;
-        try {
-          const res = await fetch("diary.json");
-          if (!res.ok) throw new Error("File not found");
-          diary = await res.json();
-        } catch (error) {
-          console.log("ใช้ข้อมูลตัวอย่าง");
-          diary = sampleDiary;
-        }
-
-        const dateNow = new Date().toISOString().slice(0, 10);
-        let entry = null;
-        
-        // หาข้อมูลที่บังคับให้แสดงในวันนี้
-        const forced = diary.find(d => d.forceDate === dateNow);
-        if (forced) {
-          entry = forced;
-        } else {
-          // เลือกแบบสุ่ม
-          const list = diary.filter(d => !d.forceDate);
-          entry = list[Math.floor(Math.random() * list.length)];
-        }
-
-        document.getElementById("date").innerText = `📅 ${entry.date}`;
-        
-        if (entry.locked) {
-          window.currentEntry = entry;
-          document.getElementById("passwordPrompt").style.display = "block";
-        } else {
-          revealLines(entry.content);
-        }
+        const res = await fetch("diary.json");
+        if (!res.ok) throw new Error("ไม่พบไฟล์ diary.json");
+        diaryData = await res.json();
+        console.log("โหลดข้อมูลไดอารี่สำเร็จ:", diaryData.length, "รายการ");
       } catch (error) {
         console.error("เกิดข้อผิดพลาด:", error);
-        document.getElementById("content").innerHTML = "เกิดข้อผิดพลาดในการโหลดข้อมูล";
+        // ใช้ข้อมูลตัวอย่าง
+        diaryData = [
+          {
+            date: "2025-07-15",
+            content: "วันนี้แค่ทดสอบข้อมูล\nไหลทีละบรรทัด",
+            locked: false
+          },
+          {
+            date: "2025-08-01",
+            content: "สุขสันต์วันเกิด 🎂",
+            locked: true,
+            password: "hello123"
+          },
+          {
+            date: "2025-12-31",
+            content: "วันนี้บังคับให้เห็นเท่านี้",
+            locked: false,
+            forceDate: "2025-12-31"
+          }
+        ];
+        alert("ไม่พบไฟล์ diary.json จะใช้ข้อมูลตัวอย่าง");
       }
     }
 
-    function checkPassword() {
-      const pw = document.getElementById("pw").value;
-      if (pw === window.currentEntry.password) {
-        document.getElementById("passwordPrompt").style.display = "none";
-        revealLines(window.currentEntry.content);
+    // ฟังก์ชันสุ่มอ่านไดอารี่
+    async function randomDiary() {
+      if (hasReadToday) {
+        alert("คุณได้อ่านไดอารี่วันนี้แล้ว กลับมาใหม่พรุ่งนี้นะ");
+        return;
+      }
+
+      // แสดงสถานะกำลังโหลด
+      document.getElementById('content').innerHTML = '<div class="loading">🔄 กำลังสุ่มไดอารี่...</div>';
+      document.getElementById('diary').className = 'entry-container show';
+
+      // หน่วงเวลาเล็กน้อยเพื่อให้ดูเป็นธรรมชาติ
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const today = new Date().toISOString().slice(0, 10);
+      let entry = null;
+
+      // เช็คว่ามีการบังคับวันที่หรือไม่
+      const forcedEntry = diaryData.find(d => d.forceDate === today);
+      if (forcedEntry) {
+        entry = forcedEntry;
+        console.log("พบไดอารี่ที่บังคับให้แสดงในวันนี้");
       } else {
-        alert("รหัสไม่ถูกต้อง");
-        document.getElementById("pw").value = "";
+        // สุ่มจากรายการที่ไม่มีการบังคับวันที่
+        const availableEntries = diaryData.filter(d => !d.forceDate);
+        if (availableEntries.length === 0) {
+          alert("ไม่มีไดอารี่ให้อ่าน");
+          return;
+        }
+        entry = availableEntries[Math.floor(Math.random() * availableEntries.length)];
+        console.log("สุ่มไดอารี่ได้:", entry.date);
+      }
+
+      currentEntry = entry;
+      document.getElementById('date').textContent = `📅 ${entry.date}`;
+      document.getElementById('content').innerHTML = '';
+
+      // เช็คว่าต้องใส่รหัสผ่านหรือไม่
+      if (entry.locked) {
+        document.getElementById('passwordPrompt').style.display = 'block';
+      } else {
+        document.getElementById('passwordPrompt').style.display = 'none';
+        revealLines(entry.content);
+      }
+
+      // บันทึกว่าได้อ่านแล้ววันนี้
+      setStoredData('lastReadDate', today);
+      hasReadToday = true;
+      document.getElementById('randomButton').disabled = true;
+      document.getElementById('randomButton').textContent = '📚 วันนี้อ่านแล้ว';
+      document.getElementById('quota').textContent = '✅ คุณได้อ่านไดอารี่วันนี้แล้ว กลับมาใหม่พรุ่งนี้นะ';
+    }
+
+    // ฟังก์ชันเช็ครหัสผ่าน
+    function checkPassword() {
+      const pw = document.getElementById('pw').value;
+      if (pw === currentEntry.password) {
+        document.getElementById('passwordPrompt').style.display = 'none';
+        document.getElementById('pw').value = '';
+        revealLines(currentEntry.content);
+      } else {
+        alert("รหัสผ่านไม่ถูกต้อง");
+        document.getElementById('pw').value = '';
       }
     }
 
+    // ฟังก์ชันแสดงข้อความทีละบรรทัด
     function revealLines(text) {
-      const lines = text.split("\n");
+      const lines = text.split('\n');
+      document.getElementById('content').innerHTML = '';
+      
       let i = 0;
       const interval = setInterval(() => {
         if (i >= lines.length) {
           clearInterval(interval);
           return;
         }
-        const line = document.createElement("div");
+        
+        const line = document.createElement('div');
         line.textContent = lines[i];
-        document.getElementById("content").appendChild(line);
+        document.getElementById('content').appendChild(line);
         i++;
       }, 1000);
     }
 
-    // เรียกใช้งานเมื่อหน้าเว็บโหลดเสร็จ
-    fetchDiary();
+    // เพิ่มการกด Enter ในช่องรหัสผ่าน
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('pw').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          checkPassword();
+        }
+      });
+    });
+
+    // เริ่มต้นโปรแกรม
+    async function init() {
+      await loadDiary();
+      checkDailyQuota();
+    }
+
+    init();
   </script>
 </body>
 </html>
