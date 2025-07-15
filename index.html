@@ -268,7 +268,7 @@
     // โหลดข้อมูลจาก diary.json
     async function loadDiary() {
       try {
-        const res = await fetch("https://script.google.com/macros/s/PASTE_YOUR_SCRIPT_URL_HERE/exec");
+        const res = await fetch("https://script.google.com/macros/s/AKfycbyNKxiD-E6OIAPhS7yZOJ5NEH0MEFKViPaA8emR3oZe5si3FAeaB7WuSQaPrAxWMMkcSg/exec");
         if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลจาก Google Sheets");
         const data = await res.json();
     
