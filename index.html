@@ -268,23 +268,20 @@
     // โหลดข้อมูลจาก diary.json
     async function loadDiary() {
       try {
-        const res = await fetch("https://script.google.com/macros/s/AKfycbyNKxiD-E6OIAPhS7yZOJ5NEH0MEFKViPaA8emR3oZe5si3FAeaB7WuSQaPrAxWMMkcSg/exec");
+        const res = await fetch("https://script.google.com/macros/s/PASTE_YOUR_SCRIPT_URL_HERE/exec");
         if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลจาก Google Sheets");
         const data = await res.json();
     
-        users = {
-          "alice": { password: "alice123", name: "อลิซ" },
-          "bob": { password: "bob456", name: "บ็อบ" },
-          "admin": { password: "admin123", name: "ผู้ดูแลระบบ" }
-          };
-    
+        users = data.users || {};
         diaryData = data.diary || [];
-        console.log("โหลดจาก Google Sheets สำเร็จ:", diaryData.length, "entries");
-        } catch (error) {
+    
+        console.log("โหลดจาก Google Sheets สำเร็จ:", Object.keys(users).length, "users,", diaryData.length, "entries");
+          } catch (error) {
         console.error("เกิดข้อผิดพลาด:", error);
         alert("โหลดจาก Google Sheets ไม่สำเร็จ");
-        }
+          }
       }
+
 
     // ฟังก์ชันสุ่มอ่านไดอารี่
     async function randomDiary() {
