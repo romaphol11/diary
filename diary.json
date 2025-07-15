@@ -1,7 +1,7 @@
-[
-  "users": [
-    "YOK&PHOL": { 
-      "password": "1717", 
+{
+  "users": {
+    "alice": { 
+      "password": "alice123", 
       "name": "อลิซ" 
     },
     "bob": { 
@@ -12,7 +12,7 @@
       "password": "admin123", 
       "name": "ผู้ดูแลระบบ" 
     }
-  ],
+  },
   "diary": [
     {
       "date": "2025-07-15",
@@ -32,4 +32,4 @@
       "forceDate": "2025-12-31"
     }
   ]
-]
+}
